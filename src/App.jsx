@@ -3,7 +3,6 @@ import { ChevronLeft, ChevronRight, DollarSign, Star, Target, TrendingUp, Users,
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, onValue, push, get } from 'firebase/database';
 
-// REPLACE THIS WITH YOUR FIREBASE CONFIG FROM STEP 1.3
 const firebaseConfig = {
   apiKey: "AIzaSyAgVVmCiipVGZdT-KxKSBFUpjBO3x9Th1s",
   authDomain: "shark-tank-voting.firebaseapp.com",
@@ -411,12 +410,26 @@ const PitchVoting = () => {
       return;
     }
     
-    const amount = parseInt(value) || 0;
+    // Only allow positive whole numbers
+    const cleanValue = value.replace(/[^\d]/g, ''); // Remove all non-digits
+    
+    if (cleanValue === '') {
+      setInvestmentAmount('');
+      updateInvestment(currentPitch.id, 0);
+      return;
+    }
+    
+    const amount = parseInt(cleanValue);
     const remainingBudget = getRemainingBudget() + userInvestment;
     
     if (amount <= remainingBudget) {
       setInvestmentAmount(amount);
       updateInvestment(currentPitch.id, amount);
+    } else {
+      // If amount exceeds budget, set to max available
+      const maxAmount = remainingBudget;
+      setInvestmentAmount(maxAmount);
+      updateInvestment(currentPitch.id, maxAmount);
     }
   };
 
@@ -520,7 +533,9 @@ const PitchVoting = () => {
             </span>
           </div>
           <input
-            type="number"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             min="0"
             max={getRemainingBudget() + userInvestment}
             step="100"
@@ -546,7 +561,28 @@ const InvestmentDashboard = () => {
   const userInvestments = investments[currentUser.id] || {};
 
   const handleInvestmentUpdate = (pitchId, newAmount) => {
-    updateInvestment(pitchId, parseInt(newAmount) || 0);
+    // Only allow positive whole numbers
+    const cleanValue = newAmount.replace(/[^\d]/g, ''); // Remove all non-digits
+    
+    if (cleanValue === '') {
+      updateInvestment(pitchId, 0);
+      return;
+    }
+    
+    const amount = parseInt(cleanValue);
+    const currentInvestments = investments[currentUser.id] || {};
+    const totalOtherInvestments = Object.entries(currentInvestments)
+      .filter(([id]) => id !== pitchId.toString())
+      .reduce((sum, [, amt]) => sum + amt, 0);
+    
+    const maxAllowed = TOTAL_BUDGET - totalOtherInvestments;
+    
+    if (amount <= maxAllowed) {
+      updateInvestment(pitchId, amount);
+    } else {
+      // If amount exceeds budget, set to max available
+      updateInvestment(pitchId, maxAllowed);
+    }
   };
 
   return (
@@ -585,7 +621,9 @@ const InvestmentDashboard = () => {
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600">$</span>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 min="0"
                 max={getRemainingBudget() + (userInvestments[pitch.id] || 0)}
                 step="100"
