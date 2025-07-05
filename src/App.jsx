@@ -4,6 +4,7 @@ import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, onValue, push, get } from 'firebase/database';
 
 // REPLACE THIS WITH YOUR FIREBASE CONFIG FROM STEP 1.3
+
 const firebaseConfig = {
   apiKey: "AIzaSyAgVVmCiipVGZdT-KxKSBFUpjBO3x9Th1s",
   authDomain: "shark-tank-voting.firebaseapp.com",
@@ -383,14 +384,14 @@ const PitchVoting = () => {
   
   const [coolness, setCoolness] = useState(userRatings.coolness || 5);
   const [relevance, setRelevance] = useState(userRatings.relevance || 5);
-  const [investmentAmount, setInvestmentAmount] = useState(userInvestment);
+  const [investmentAmount, setInvestmentAmount] = useState(userInvestment || '');
 
   useEffect(() => {
     const updatedUserRatings = ratings[currentUser.id]?.[currentPitch.id] || {};
     const updatedUserInvestment = investments[currentUser.id]?.[currentPitch.id] || 0;
     setCoolness(updatedUserRatings.coolness || 5);
     setRelevance(updatedUserRatings.relevance || 5);
-    setInvestmentAmount(updatedUserInvestment);
+    setInvestmentAmount(updatedUserInvestment || '');
   }, [currentPitchIndex, currentPitch.id, ratings, investments, currentUser.id]);
 
   const handleCoolnessChange = (value) => {
@@ -404,6 +405,13 @@ const PitchVoting = () => {
   };
 
   const handleInvestmentChange = (value) => {
+    // Handle empty string to allow deletion
+    if (value === '') {
+      setInvestmentAmount('');
+      updateInvestment(currentPitch.id, 0);
+      return;
+    }
+    
     const amount = parseInt(value) || 0;
     const remainingBudget = getRemainingBudget() + userInvestment;
     
@@ -517,9 +525,10 @@ const PitchVoting = () => {
             min="0"
             max={getRemainingBudget() + userInvestment}
             step="100"
-            value={investmentAmount}
+            value={investmentAmount === '' ? '' : investmentAmount}
             onChange={(e) => handleInvestmentChange(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            placeholder="0"
           />
           <p className="text-sm text-gray-600 mt-2">
             Remaining budget: <span className="font-bold text-green-600">
@@ -687,13 +696,13 @@ const AdminDashboard = () => {
           </select>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[400px]">
               <thead>
                 <tr className="border-b">
                   <th className="text-left p-2">Participant</th>
                   <th className="text-center p-2">Coolness</th>
                   <th className="text-center p-2">Relevance</th>
-                  <th className="text-right p-2">Investment</th>
+                  <th className="text-right p-2 whitespace-nowrap">Investment</th>
                 </tr>
               </thead>
               <tbody>
@@ -710,7 +719,7 @@ const AdminDashboard = () => {
                         {detail.relevance || '-'}
                       </span>
                     </td>
-                    <td className="text-right p-2">
+                    <td className="text-right p-2 whitespace-nowrap">
                       <span className="font-semibold text-green-600">
                         ${detail.investment.toLocaleString()}
                       </span>
@@ -833,7 +842,7 @@ const Results = () => {
 };
 
 // Session Header Component
-const SessionHeader = ({ isAdmin, setIsAdmin }) => {
+const SessionHeader = () => {
   const { sessionId, currentUser, allParticipants } = useApp();
   const [copied, setCopied] = useState(false);
 
@@ -847,15 +856,15 @@ const SessionHeader = ({ isAdmin, setIsAdmin }) => {
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-4 mb-6">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Shark Tank Voting Session</h1>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Shark Tank Voting Session</h1>
           <div className="flex items-center gap-2 mt-2">
-            <span className="text-sm text-gray-600">Session URL:</span>
-            <code className="text-xs bg-gray-100 px-2 py-1 rounded">{sessionUrl}</code>
+            <span className="text-sm text-gray-600 hidden sm:inline">Session URL:</span>
+            <code className="text-xs bg-gray-100 px-2 py-1 rounded truncate max-w-[200px] sm:max-w-none">{sessionUrl}</code>
             <button
               onClick={copyToClipboard}
-              className="p-1 hover:bg-gray-100 rounded transition"
+              className="p-1 hover:bg-gray-100 rounded transition flex-shrink-0"
               title="Copy session URL"
             >
               <Copy className="w-4 h-4 text-gray-600" />
@@ -868,23 +877,81 @@ const SessionHeader = ({ isAdmin, setIsAdmin }) => {
             <Users className="w-4 h-4 mr-1" />
             {allParticipants.length} participants
           </div>
-          <button
-            onClick={() => setIsAdmin(!isAdmin)}
-            className={`px-3 py-1 rounded-lg text-sm font-medium transition ${
-              isAdmin 
-                ? 'bg-indigo-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            {isAdmin ? 'Exit Admin' : 'Admin View'}
-          </button>
           <div className="text-right">
             <p className="text-sm text-gray-600">Welcome,</p>
             <p className="font-semibold text-gray-800">{currentUser.name}</p>
           </div>
         </div>
       </div>
-      {isAdmin && <AdminDashboard />}
+    </div>
+  );
+};
+
+// Admin Page Component
+const AdminPage = () => {
+  const { sessionId, allParticipants } = useApp();
+  const [copied, setCopied] = useState(false);
+
+  const sessionUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
+  const adminUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}&admin=true`;
+
+  const copySessionUrl = () => {
+    navigator.clipboard.writeText(sessionUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 p-4">
+      <div className="max-w-6xl mx-auto">
+        <div className="bg-white rounded-xl shadow-lg p-4 mb-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
+              <div className="text-sm text-gray-600 flex items-center mt-2">
+                <Users className="w-4 h-4 mr-1" />
+                {allParticipants.length} participants
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Session URL:</span>
+                <code className="text-xs bg-gray-100 px-2 py-1 rounded truncate max-w-[200px]">{sessionUrl}</code>
+                <button
+                  onClick={copySessionUrl}
+                  className="p-1 hover:bg-gray-100 rounded transition"
+                  title="Copy session URL"
+                >
+                  <Copy className="w-4 h-4 text-gray-600" />
+                </button>
+                {copied && <span className="text-xs text-green-600">Copied!</span>}
+              </div>
+              <button
+                onClick={() => window.location.href = sessionUrl}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
+              >
+                Exit Admin View
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <Results />
+          </div>
+          <div>
+            <AdminDashboard />
+          </div>
+        </div>
+        
+        <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800 font-medium">Admin URL</p>
+          <p className="text-xs text-blue-700 mt-1">
+            Bookmark this URL to return to admin view: <code className="bg-blue-100 px-1 rounded">{adminUrl}</code>
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
@@ -892,7 +959,8 @@ const SessionHeader = ({ isAdmin, setIsAdmin }) => {
 // Main App Component
 const App = () => {
   const { currentUser, sessionId, isLoading, sessionExists } = useApp();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const urlParams = new URLSearchParams(window.location.search);
+  const isAdminView = urlParams.get('admin') === 'true';
 
   if (isLoading) {
     return (
@@ -923,23 +991,29 @@ const App = () => {
     );
   }
 
+  // Show admin page if admin=true in URL
+  if (isAdminView) {
+    return <AdminPage />;
+  }
+
   if (!currentUser) {
     return <Login />;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 p-4">
-      <div className="max-w-6xl mx-auto">
-        <SessionHeader isAdmin={isAdmin} setIsAdmin={setIsAdmin} />
+      <div className="max-w-4xl mx-auto">
+        <SessionHeader />
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
-            <PitchVoting />
-            <InvestmentDashboard />
-          </div>
-          <div>
-            <Results />
-          </div>
+        <div className="grid grid-cols-1 gap-6">
+          <PitchVoting />
+          <InvestmentDashboard />
+        </div>
+        
+        <div className="mt-6 p-4 bg-gray-100 rounded-lg text-center">
+          <p className="text-sm text-gray-600">
+            Admin? Add <code className="bg-white px-2 py-1 rounded text-xs">&admin=true</code> to the URL
+          </p>
         </div>
       </div>
     </div>
