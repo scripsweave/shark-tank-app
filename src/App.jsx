@@ -1,0 +1,959 @@
+import React, { useState, useEffect, createContext, useContext, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, DollarSign, Star, Target, TrendingUp, Users, Award, Copy, Link } from 'lucide-react';
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, set, onValue, push, get } from 'firebase/database';
+
+// REPLACE THIS WITH YOUR FIREBASE CONFIG FROM STEP 1.3
+const firebaseConfig = {
+  apiKey: "AIzaSyAgVVmCiipVGZdT-KxKSBFUpjBO3x9Th1s",
+  authDomain: "shark-tank-voting.firebaseapp.com",
+  databaseURL: "https://shark-tank-voting-default-rtdb.firebaseio.com",
+  projectId: "shark-tank-voting",
+  storageBucket: "shark-tank-voting.firebasestorage.app",
+  messagingSenderId: "368502305847",
+  appId: "1:368502305847:web:47e3aff46733312ed6fbb2"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// Context for app state
+const AppContext = createContext();
+
+const useApp = () => {
+  const context = useContext(AppContext);
+  if (!context) throw new Error('useApp must be used within AppProvider');
+  return context;
+};
+
+// Sample pitches data
+const samplePitches = [
+  {
+    id: 1,
+    title: "EcoSmart Home",
+    presenter: "Sarah Johnson",
+    description: "AI-powered home automation system that reduces energy consumption by 40%"
+  },
+  {
+    id: 2,
+    title: "HealthTrack Pro",
+    presenter: "Mike Chen",
+    description: "Wearable device that monitors vital signs and predicts health issues 72 hours in advance"
+  },
+  {
+    id: 3,
+    title: "LearnFlow",
+    presenter: "Emma Williams",
+    description: "Personalized AI tutor that adapts to each student's learning style"
+  },
+  {
+    id: 4,
+    title: "FoodSave",
+    presenter: "Carlos Rodriguez",
+    description: "App connecting restaurants with food banks to reduce waste by 60%"
+  }
+];
+
+// Debounce utility
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+const AppProvider = ({ children, sessionId }) => {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [currentPitchIndex, setCurrentPitchIndex] = useState(0);
+  const [ratings, setRatings] = useState({});
+  const [investments, setInvestments] = useState({});
+  const [allParticipants, setAllParticipants] = useState([]);
+  const [sessionExists, setSessionExists] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const TOTAL_BUDGET = 10000;
+
+  // Initialize session and listen for updates
+  useEffect(() => {
+    if (!sessionId) {
+      setIsLoading(false);
+      return;
+    }
+
+    const initSession = async () => {
+      try {
+        const sessionRef = ref(db, `sessions/${sessionId}`);
+        const snapshot = await get(sessionRef);
+        if (!snapshot.exists()) {
+          setSessionExists(false);
+          setIsLoading(false);
+          return;
+        }
+
+        setSessionExists(true);
+        setIsLoading(false);
+
+        const ratingsRef = ref(db, `sessions/${sessionId}/ratings`);
+        const investmentsRef = ref(db, `sessions/${sessionId}/investments`);
+        const usersRef = ref(db, `sessions/${sessionId}/users`);
+
+        const unsubRatings = onValue(ratingsRef, (snapshot) => {
+          const data = snapshot.val();
+          if (data) setRatings(data);
+        });
+
+        const unsubInvestments = onValue(investmentsRef, (snapshot) => {
+          const data = snapshot.val();
+          if (data) setInvestments(data);
+        });
+
+        const unsubUsers = onValue(usersRef, (snapshot) => {
+          const data = snapshot.val();
+          if (data) setAllParticipants(Object.values(data));
+        });
+
+        return () => {
+          unsubRatings();
+          unsubInvestments();
+          unsubUsers();
+        };
+      } catch (error) {
+        console.error('Error initializing session:', error);
+        setSessionExists(false);
+        setIsLoading(false);
+      }
+    };
+
+    initSession();
+  }, [sessionId]);
+
+  const login = async (name) => {
+    const user = { id: Date.now(), name, joinedAt: new Date().toISOString() };
+    setCurrentUser(user);
+    
+    if (sessionId) {
+      await set(ref(db, `sessions/${sessionId}/users/${user.id}`), user);
+    }
+  };
+
+  const updateRating = useMemo(
+    () => debounce(async (pitchId, category, value) => {
+      if (!currentUser || !sessionId) return;
+      
+      await set(
+        ref(db, `sessions/${sessionId}/ratings/${currentUser.id}/${pitchId}/${category}`),
+        value
+      );
+    }, 300),
+    [currentUser, sessionId]
+  );
+
+  const updateInvestment = async (pitchId, amount) => {
+    if (!currentUser || !sessionId) return false;
+    
+    const currentInvestments = investments[currentUser.id] || {};
+    const totalInvested = Object.entries(currentInvestments)
+      .filter(([id]) => id !== pitchId.toString())
+      .reduce((sum, [, amt]) => sum + amt, 0);
+    
+    if (totalInvested + amount > TOTAL_BUDGET) {
+      alert(`Cannot invest $${amount}. You only have $${TOTAL_BUDGET - totalInvested} remaining.`);
+      return false;
+    }
+
+    await set(
+      ref(db, `sessions/${sessionId}/investments/${currentUser.id}/${pitchId}`),
+      amount
+    );
+    return true;
+  };
+
+  const createSession = async () => {
+    const newSessionRef = push(ref(db, 'sessions'));
+    const sessionId = newSessionRef.key;
+    await set(newSessionRef, {
+      createdAt: new Date().toISOString(),
+      pitches: samplePitches
+    });
+    return sessionId;
+  };
+
+  const getTotalInvested = () => {
+    if (!currentUser) return 0;
+    const userInvestments = investments[currentUser.id] || {};
+    return Object.values(userInvestments).reduce((sum, amt) => sum + amt, 0);
+  };
+
+  const getRemainingBudget = () => {
+    return TOTAL_BUDGET - getTotalInvested();
+  };
+
+  const getAggregatedResults = () => {
+    return samplePitches.map(pitch => {
+      let totalCoolness = 0, totalRelevance = 0, totalInvestment = 0;
+      let ratingCount = 0, investorCount = 0;
+
+      Object.entries(ratings).forEach(([userId, userRatings]) => {
+        if (userRatings[pitch.id]) {
+          if (userRatings[pitch.id].coolness) {
+            totalCoolness += userRatings[pitch.id].coolness;
+            ratingCount++;
+          }
+          if (userRatings[pitch.id].relevance) {
+            totalRelevance += userRatings[pitch.id].relevance;
+          }
+        }
+      });
+
+      Object.entries(investments).forEach(([userId, userInvestments]) => {
+        if (userInvestments[pitch.id] && userInvestments[pitch.id] > 0) {
+          totalInvestment += userInvestments[pitch.id];
+          investorCount++;
+        }
+      });
+
+      const avgCoolness = ratingCount > 0 ? totalCoolness / ratingCount : 0;
+      const avgRelevance = ratingCount > 0 ? totalRelevance / ratingCount : 0;
+      
+      const maxPossibleInvestment = allParticipants.length * TOTAL_BUDGET;
+      const normalizedInvestment = maxPossibleInvestment > 0 ? (totalInvestment / maxPossibleInvestment) * 10 : 0;
+      const overallScore = (avgCoolness * 0.3) + (avgRelevance * 0.3) + (normalizedInvestment * 0.4);
+
+      return {
+        ...pitch,
+        avgCoolness,
+        avgRelevance,
+        totalInvestment,
+        investorCount,
+        overallScore
+      };
+    }).sort((a, b) => b.overallScore - a.overallScore);
+  };
+
+  return (
+    <AppContext.Provider value={{
+      currentUser,
+      login,
+      currentPitchIndex,
+      setCurrentPitchIndex,
+      ratings,
+      updateRating,
+      investments,
+      updateInvestment,
+      getTotalInvested,
+      getRemainingBudget,
+      getAggregatedResults,
+      allParticipants,
+      TOTAL_BUDGET,
+      sessionId,
+      createSession,
+      sessionExists,
+      isLoading
+    }}>
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+// Session Creation Component
+const CreateSession = () => {
+  const { createSession } = useApp();
+  const [isCreating, setIsCreating] = useState(false);
+
+  const handleCreateSession = async () => {
+    setIsCreating(true);
+    try {
+      const newSessionId = await createSession();
+      const sessionUrl = `${window.location.origin}${window.location.pathname}?session=${newSessionId}`;
+      window.location.href = sessionUrl;
+    } catch (error) {
+      console.error('Error creating session:', error);
+      alert('Failed to create session. Please try again.');
+    }
+    setIsCreating(false);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full text-center">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Shark Tank Voting</h1>
+        <p className="text-gray-600 mb-8">Create a session or join an existing one</p>
+        
+        <button
+          onClick={handleCreateSession}
+          disabled={isCreating}
+          className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition duration-200 flex items-center justify-center"
+        >
+          {isCreating ? (
+            <span>Creating session...</span>
+          ) : (
+            <>
+              <Link className="w-5 h-5 mr-2" />
+              Create New Session
+            </>
+          )}
+        </button>
+        
+        <div className="mt-6 text-sm text-gray-600">
+          <p>Once created, share the session URL with all participants</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Login Component
+const Login = () => {
+  const [name, setName] = useState('');
+  const { login, sessionId } = useApp();
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (name.trim()) {
+      login(name.trim());
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">Shark Tank Voting</h1>
+        <p className="text-gray-600 mb-6">
+          {sessionId ? 'Enter your name to join the session' : 'Create or join a session to begin'}
+        </p>
+        
+        {sessionId && (
+          <>
+            <div>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSubmit(e);
+                  }
+                }}
+                placeholder="Your name"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                autoFocus
+              />
+              
+              <button
+                onClick={handleSubmit}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-200"
+              >
+                Join Session
+              </button>
+            </div>
+            
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-600">
+                You'll receive <span className="font-bold text-green-600">${'10,000'}</span> to invest
+              </p>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Pitch Voting Component
+const PitchVoting = () => {
+  const {
+    currentPitchIndex,
+    setCurrentPitchIndex,
+    ratings,
+    investments,
+    updateRating,
+    updateInvestment,
+    currentUser,
+    getRemainingBudget
+  } = useApp();
+  
+  const currentPitch = samplePitches[currentPitchIndex];
+  const userRatings = ratings[currentUser.id]?.[currentPitch.id] || {};
+  const userInvestment = investments[currentUser.id]?.[currentPitch.id] || 0;
+  
+  const [coolness, setCoolness] = useState(userRatings.coolness || 5);
+  const [relevance, setRelevance] = useState(userRatings.relevance || 5);
+  const [investmentAmount, setInvestmentAmount] = useState(userInvestment);
+
+  useEffect(() => {
+    const updatedUserRatings = ratings[currentUser.id]?.[currentPitch.id] || {};
+    const updatedUserInvestment = investments[currentUser.id]?.[currentPitch.id] || 0;
+    setCoolness(updatedUserRatings.coolness || 5);
+    setRelevance(updatedUserRatings.relevance || 5);
+    setInvestmentAmount(updatedUserInvestment);
+  }, [currentPitchIndex, currentPitch.id, ratings, investments, currentUser.id]);
+
+  const handleCoolnessChange = (value) => {
+    setCoolness(value);
+    updateRating(currentPitch.id, 'coolness', parseInt(value));
+  };
+
+  const handleRelevanceChange = (value) => {
+    setRelevance(value);
+    updateRating(currentPitch.id, 'relevance', parseInt(value));
+  };
+
+  const handleInvestmentChange = (value) => {
+    const amount = parseInt(value) || 0;
+    const remainingBudget = getRemainingBudget() + userInvestment;
+    
+    if (amount <= remainingBudget) {
+      setInvestmentAmount(amount);
+      updateInvestment(currentPitch.id, amount);
+    }
+  };
+
+  const nextPitch = () => {
+    if (currentPitchIndex < samplePitches.length - 1) {
+      setCurrentPitchIndex(currentPitchIndex + 1);
+    }
+  };
+
+  const prevPitch = () => {
+    if (currentPitchIndex > 0) {
+      setCurrentPitchIndex(currentPitchIndex - 1);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+      <div className="flex justify-between items-center mb-6">
+        <button
+          onClick={prevPitch}
+          disabled={currentPitchIndex === 0}
+          className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-800">{currentPitch.title}</h2>
+          <p className="text-gray-600">by {currentPitch.presenter}</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Pitch {currentPitchIndex + 1} of {samplePitches.length}
+          </p>
+        </div>
+        
+        <button
+          onClick={nextPitch}
+          disabled={currentPitchIndex === samplePitches.length - 1}
+          className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+
+      <p className="text-gray-700 mb-8 text-center bg-gray-50 p-4 rounded-lg">
+        {currentPitch.description}
+      </p>
+
+      <div className="space-y-6">
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="flex items-center text-gray-700 font-medium">
+              <Star className="w-5 h-5 mr-2 text-yellow-500" />
+              How cool is this?
+            </label>
+            <span className="text-2xl font-bold text-yellow-500">{coolness}</span>
+          </div>
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={coolness}
+            onChange={(e) => handleCoolnessChange(e.target.value)}
+            className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+          />
+          <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <span>Not cool</span>
+            <span>Super cool!</span>
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="flex items-center text-gray-700 font-medium">
+              <Target className="w-5 h-5 mr-2 text-blue-500" />
+              How relevant to us/clients?
+            </label>
+            <span className="text-2xl font-bold text-blue-500">{relevance}</span>
+          </div>
+          <input
+            type="range"
+            min="1"
+            max="10"
+            value={relevance}
+            onChange={(e) => handleRelevanceChange(e.target.value)}
+            className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+          />
+          <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <span>Not relevant</span>
+            <span>Highly relevant!</span>
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="flex items-center text-gray-700 font-medium">
+              <DollarSign className="w-5 h-5 mr-2 text-green-500" />
+              Investment Amount
+            </label>
+            <span className="text-2xl font-bold text-green-500">
+              ${investmentAmount.toLocaleString()}
+            </span>
+          </div>
+          <input
+            type="number"
+            min="0"
+            max={getRemainingBudget() + userInvestment}
+            step="100"
+            value={investmentAmount}
+            onChange={(e) => handleInvestmentChange(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+          <p className="text-sm text-gray-600 mt-2">
+            Remaining budget: <span className="font-bold text-green-600">
+              ${getRemainingBudget().toLocaleString()}
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Investment Dashboard Component
+const InvestmentDashboard = () => {
+  const { investments, updateInvestment, currentUser, getRemainingBudget, TOTAL_BUDGET } = useApp();
+  const userInvestments = investments[currentUser.id] || {};
+
+  const handleInvestmentUpdate = (pitchId, newAmount) => {
+    updateInvestment(pitchId, parseInt(newAmount) || 0);
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+      <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+        <TrendingUp className="w-6 h-6 mr-2 text-purple-500" />
+        Your Investment Portfolio
+      </h3>
+      
+      <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg">
+        <div className="flex justify-between items-center">
+          <span className="text-gray-700">Total Budget:</span>
+          <span className="text-xl font-bold">${TOTAL_BUDGET.toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between items-center mt-2">
+          <span className="text-gray-700">Invested:</span>
+          <span className="text-xl font-bold text-purple-600">
+            ${(TOTAL_BUDGET - getRemainingBudget()).toLocaleString()}
+          </span>
+        </div>
+        <div className="flex justify-between items-center mt-2">
+          <span className="text-gray-700">Remaining:</span>
+          <span className="text-xl font-bold text-green-600">
+            ${getRemainingBudget().toLocaleString()}
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {samplePitches.map(pitch => (
+          <div key={pitch.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="flex-1">
+              <h4 className="font-semibold text-gray-800">{pitch.title}</h4>
+              <p className="text-sm text-gray-600">{pitch.presenter}</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">$</span>
+              <input
+                type="number"
+                min="0"
+                max={getRemainingBudget() + (userInvestments[pitch.id] || 0)}
+                step="100"
+                value={userInvestments[pitch.id] || 0}
+                onChange={(e) => handleInvestmentUpdate(pitch.id, e.target.value)}
+                className="w-24 px-2 py-1 text-right border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Admin Dashboard Component
+const AdminDashboard = () => {
+  const { ratings, investments, allParticipants, TOTAL_BUDGET } = useApp();
+  const [selectedPitch, setSelectedPitch] = useState(samplePitches[0].id);
+  const [viewMode, setViewMode] = useState('byPitch');
+
+  const getPitchDetails = (pitchId) => {
+    const pitchRatings = [];
+
+    allParticipants.forEach(user => {
+      const userRating = ratings[user.id]?.[pitchId];
+      const userInvestment = investments[user.id]?.[pitchId] || 0;
+
+      pitchRatings.push({
+        userId: user.id,
+        userName: user.name,
+        coolness: userRating?.coolness || 0,
+        relevance: userRating?.relevance || 0,
+        investment: userInvestment
+      });
+    });
+
+    return pitchRatings;
+  };
+
+  const getUserDetails = (userId) => {
+    const user = allParticipants.find(u => u.id === userId);
+    if (!user) return null;
+
+    const userRatings = ratings[userId] || {};
+    const userInvestments = investments[userId] || {};
+    const totalInvested = Object.values(userInvestments).reduce((sum, amt) => sum + amt, 0);
+
+    const pitchDetails = samplePitches.map(pitch => ({
+      pitchId: pitch.id,
+      pitchTitle: pitch.title,
+      coolness: userRatings[pitch.id]?.coolness || 0,
+      relevance: userRatings[pitch.id]?.relevance || 0,
+      investment: userInvestments[pitch.id] || 0
+    }));
+
+    return {
+      userName: user.name,
+      totalInvested,
+      remainingBudget: TOTAL_BUDGET - totalInvested,
+      pitchDetails
+    };
+  };
+
+  return (
+    <div className="mt-6 border-t pt-6">
+      <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+        <Users className="w-5 h-5 mr-2 text-indigo-500" />
+        Admin View - Detailed Breakdown
+      </h3>
+
+      <div className="mb-4 flex gap-2">
+        <button
+          onClick={() => setViewMode('byPitch')}
+          className={`px-4 py-2 rounded-lg font-medium transition ${
+            viewMode === 'byPitch' 
+              ? 'bg-indigo-600 text-white' 
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          View by Pitch
+        </button>
+        <button
+          onClick={() => setViewMode('byUser')}
+          className={`px-4 py-2 rounded-lg font-medium transition ${
+            viewMode === 'byUser' 
+              ? 'bg-indigo-600 text-white' 
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          View by User
+        </button>
+      </div>
+
+      {viewMode === 'byPitch' ? (
+        <div>
+          <select
+            value={selectedPitch}
+            onChange={(e) => setSelectedPitch(parseInt(e.target.value))}
+            className="w-full p-2 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            {samplePitches.map(pitch => (
+              <option key={pitch.id} value={pitch.id}>
+                {pitch.title} - {pitch.presenter}
+              </option>
+            ))}
+          </select>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2">Participant</th>
+                  <th className="text-center p-2">Coolness</th>
+                  <th className="text-center p-2">Relevance</th>
+                  <th className="text-right p-2">Investment</th>
+                </tr>
+              </thead>
+              <tbody>
+                {getPitchDetails(selectedPitch).map((detail, index) => (
+                  <tr key={detail.userId} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                    <td className="p-2">{detail.userName}</td>
+                    <td className="text-center p-2">
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">
+                        {detail.coolness || '-'}
+                      </span>
+                    </td>
+                    <td className="text-center p-2">
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">
+                        {detail.relevance || '-'}
+                      </span>
+                    </td>
+                    <td className="text-right p-2">
+                      <span className="font-semibold text-green-600">
+                        ${detail.investment.toLocaleString()}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {allParticipants.map(user => {
+              const details = getUserDetails(user.id);
+              if (!details) return null;
+
+              return (
+                <div key={user.id} className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex justify-between items-start mb-3">
+                    <h4 className="font-bold text-gray-800">{details.userName}</h4>
+                    <div className="text-right text-sm">
+                      <div>Invested: <span className="font-semibold text-purple-600">${details.totalInvested.toLocaleString()}</span></div>
+                      <div>Remaining: <span className="font-semibold text-green-600">${details.remainingBudget.toLocaleString()}</span></div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {details.pitchDetails.map(pitch => (
+                      <div key={pitch.pitchId} className="flex items-center justify-between text-sm">
+                        <span className="flex-1">{pitch.pitchTitle}</span>
+                        <div className="flex gap-2">
+                          <span className="w-20 text-right font-semibold text-green-600">
+                            ${pitch.investment.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Results Component
+const Results = () => {
+  const { getAggregatedResults, allParticipants } = useApp();
+  const results = getAggregatedResults();
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-6">
+      <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+        <Award className="w-6 h-6 mr-2 text-yellow-500" />
+        Live Results
+      </h3>
+      
+      <div className="mb-4 text-sm text-gray-600 flex items-center">
+        <Users className="w-4 h-4 mr-1" />
+        {allParticipants.length} participants voting
+      </div>
+
+      <div className="space-y-4">
+        {results.map((result, index) => (
+          <div
+            key={result.id}
+            className={`p-4 rounded-lg ${
+              index === 0 ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 border-2 border-yellow-300' : 'bg-gray-50'
+            }`}
+          >
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <div className="flex items-center">
+                  {index === 0 && <Award className="w-5 h-5 mr-2 text-yellow-600" />}
+                  <h4 className="font-bold text-gray-800">
+                    #{index + 1} {result.title}
+                  </h4>
+                </div>
+                <p className="text-sm text-gray-600">{result.presenter}</p>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-gray-800">
+                  {result.overallScore.toFixed(1)}
+                </div>
+                <div className="text-xs text-gray-600">Overall Score</div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4 mt-3 text-center">
+              <div className="bg-white p-2 rounded">
+                <div className="text-lg font-semibold text-yellow-600">
+                  {result.avgCoolness.toFixed(1)}
+                </div>
+                <div className="text-xs text-gray-600">Coolness</div>
+              </div>
+              <div className="bg-white p-2 rounded">
+                <div className="text-lg font-semibold text-blue-600">
+                  {result.avgRelevance.toFixed(1)}
+                </div>
+                <div className="text-xs text-gray-600">Relevance</div>
+              </div>
+              <div className="bg-white p-2 rounded">
+                <div className="text-lg font-semibold text-green-600">
+                  ${result.totalInvestment.toLocaleString()}
+                </div>
+                <div className="text-xs text-gray-600">
+                  {result.investorCount} investors
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Session Header Component
+const SessionHeader = ({ isAdmin, setIsAdmin }) => {
+  const { sessionId, currentUser, allParticipants } = useApp();
+  const [copied, setCopied] = useState(false);
+
+  const sessionUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(sessionUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-lg p-4 mb-6">
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Shark Tank Voting Session</h1>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-sm text-gray-600">Session URL:</span>
+            <code className="text-xs bg-gray-100 px-2 py-1 rounded">{sessionUrl}</code>
+            <button
+              onClick={copyToClipboard}
+              className="p-1 hover:bg-gray-100 rounded transition"
+              title="Copy session URL"
+            >
+              <Copy className="w-4 h-4 text-gray-600" />
+            </button>
+            {copied && <span className="text-xs text-green-600">Copied!</span>}
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-gray-600 flex items-center">
+            <Users className="w-4 h-4 mr-1" />
+            {allParticipants.length} participants
+          </div>
+          <button
+            onClick={() => setIsAdmin(!isAdmin)}
+            className={`px-3 py-1 rounded-lg text-sm font-medium transition ${
+              isAdmin 
+                ? 'bg-indigo-600 text-white' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            {isAdmin ? 'Exit Admin' : 'Admin View'}
+          </button>
+          <div className="text-right">
+            <p className="text-sm text-gray-600">Welcome,</p>
+            <p className="font-semibold text-gray-800">{currentUser.name}</p>
+          </div>
+        </div>
+      </div>
+      {isAdmin && <AdminDashboard />}
+    </div>
+  );
+};
+
+// Main App Component
+const App = () => {
+  const { currentUser, sessionId, isLoading, sessionExists } = useApp();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading session...</div>
+      </div>
+    );
+  }
+
+  if (!sessionId) {
+    return <CreateSession />;
+  }
+
+  if (!sessionExists) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full text-center">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">Session Not Found</h1>
+          <p className="text-gray-600 mb-6">This session doesn't exist or has expired.</p>
+          <button
+            onClick={() => window.location.href = window.location.pathname}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Create New Session
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <Login />;
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 p-4">
+      <div className="max-w-6xl mx-auto">
+        <SessionHeader isAdmin={isAdmin} setIsAdmin={setIsAdmin} />
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <PitchVoting />
+            <InvestmentDashboard />
+          </div>
+          <div>
+            <Results />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Root Component with Provider
+export default function SharkTankApp() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionId = urlParams.get('session');
+  
+  return (
+    <AppProvider sessionId={sessionId}>
+      <App />
+    </AppProvider>
+  );
+}
