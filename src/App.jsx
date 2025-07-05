@@ -4,7 +4,6 @@ import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, onValue, push, get } from 'firebase/database';
 
 // REPLACE THIS WITH YOUR FIREBASE CONFIG FROM STEP 1.3
-
 const firebaseConfig = {
   apiKey: "AIzaSyAgVVmCiipVGZdT-KxKSBFUpjBO3x9Th1s",
   authDomain: "shark-tank-voting.firebaseapp.com",
@@ -492,7 +491,7 @@ const PitchVoting = () => {
           <div className="flex items-center justify-between mb-2">
             <label className="flex items-center text-gray-700 font-medium">
               <Target className="w-5 h-5 mr-2 text-blue-500" />
-              How relevant to us/clients?
+              How relevant is this to us or our clients?
             </label>
             <span className="text-2xl font-bold text-blue-500">{relevance}</span>
           </div>
@@ -652,7 +651,7 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="mt-6 border-t pt-6">
+    <div className="bg-white rounded-xl shadow-lg p-6">
       <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
         <Users className="w-5 h-5 mr-2 text-indigo-500" />
         Admin View - Detailed Breakdown
@@ -856,10 +855,10 @@ const SessionHeader = () => {
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-4 mb-6">
+      <h1 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-4">Shark Tank Voting Session</h1>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div className="flex-1 min-w-0">
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Shark Tank Voting Session</h1>
-          <div className="flex items-center gap-2 mt-2">
+          <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600 hidden sm:inline">Session URL:</span>
             <code className="text-xs bg-gray-100 px-2 py-1 rounded truncate max-w-[200px] sm:max-w-none">{sessionUrl}</code>
             <button
@@ -1008,12 +1007,6 @@ const App = () => {
         <div className="grid grid-cols-1 gap-6">
           <PitchVoting />
           <InvestmentDashboard />
-        </div>
-        
-        <div className="mt-6 p-4 bg-gray-100 rounded-lg text-center">
-          <p className="text-sm text-gray-600">
-            Admin? Add <code className="bg-white px-2 py-1 rounded text-xs">&admin=true</code> to the URL
-          </p>
         </div>
       </div>
     </div>
