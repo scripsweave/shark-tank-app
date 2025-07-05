@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, DollarSign, Star, Target, TrendingUp, Users,
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, onValue, push, get } from 'firebase/database';
 
+// REPLACE THIS WITH YOUR FIREBASE CONFIG FROM STEP 1.3
 const firebaseConfig = {
   apiKey: "AIzaSyAgVVmCiipVGZdT-KxKSBFUpjBO3x9Th1s",
   authDomain: "shark-tank-voting.firebaseapp.com",
@@ -12,6 +13,7 @@ const firebaseConfig = {
   messagingSenderId: "368502305847",
   appId: "1:368502305847:web:47e3aff46733312ed6fbb2"
 };
+
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
@@ -74,6 +76,7 @@ const AppProvider = ({ children, sessionId }) => {
   const [allParticipants, setAllParticipants] = useState([]);
   const [sessionExists, setSessionExists] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionPitches, setSessionPitches] = useState(samplePitches);
   
   const TOTAL_BUDGET = 10000;
 
@@ -94,6 +97,8 @@ const AppProvider = ({ children, sessionId }) => {
           return;
         }
 
+        const sessionData = snapshot.val();
+        setSessionPitches(sessionData.pitches || samplePitches);
         setSessionExists(true);
         setIsLoading(false);
 
@@ -172,12 +177,12 @@ const AppProvider = ({ children, sessionId }) => {
     return true;
   };
 
-  const createSession = async () => {
+  const createSession = async (pitches = samplePitches) => {
     const newSessionRef = push(ref(db, 'sessions'));
     const sessionId = newSessionRef.key;
     await set(newSessionRef, {
       createdAt: new Date().toISOString(),
-      pitches: samplePitches
+      pitches: pitches
     });
     return sessionId;
   };
@@ -193,7 +198,7 @@ const AppProvider = ({ children, sessionId }) => {
   };
 
   const getAggregatedResults = () => {
-    return samplePitches.map(pitch => {
+    return sessionPitches.map(pitch => {
       let totalCoolness = 0, totalRelevance = 0, totalInvestment = 0;
       let ratingCount = 0, investorCount = 0;
 
@@ -252,7 +257,8 @@ const AppProvider = ({ children, sessionId }) => {
       sessionId,
       createSession,
       sessionExists,
-      isLoading
+      isLoading,
+      sessionPitches
     }}>
       {children}
     </AppContext.Provider>
@@ -263,11 +269,14 @@ const AppProvider = ({ children, sessionId }) => {
 const CreateSession = () => {
   const { createSession } = useApp();
   const [isCreating, setIsCreating] = useState(false);
+  const [showPitchSetup, setShowPitchSetup] = useState(false);
+  const [customPitches, setCustomPitches] = useState(samplePitches);
+  const [editingPitch, setEditingPitch] = useState(null);
 
   const handleCreateSession = async () => {
     setIsCreating(true);
     try {
-      const newSessionId = await createSession();
+      const newSessionId = await createSession(customPitches);
       const sessionUrl = `${window.location.origin}${window.location.pathname}?session=${newSessionId}`;
       window.location.href = sessionUrl;
     } catch (error) {
@@ -277,6 +286,125 @@ const CreateSession = () => {
     setIsCreating(false);
   };
 
+  const updatePitch = (index, field, value) => {
+    const updated = [...customPitches];
+    updated[index] = { ...updated[index], [field]: value };
+    setCustomPitches(updated);
+  };
+
+  const addPitch = () => {
+    const newPitch = {
+      id: customPitches.length + 1,
+      title: "New Pitch",
+      presenter: "Presenter Name",
+      description: "Pitch description"
+    };
+    setCustomPitches([...customPitches, newPitch]);
+  };
+
+  const removePitch = (index) => {
+    if (customPitches.length > 1) {
+      const updated = customPitches.filter((_, i) => i !== index);
+      // Re-number the IDs
+      updated.forEach((pitch, i) => {
+        pitch.id = i + 1;
+      });
+      setCustomPitches(updated);
+    }
+  };
+
+  if (showPitchSetup) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 p-4 overflow-auto">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-xl shadow-2xl p-8">
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Configure Pitches</h1>
+            <p className="text-gray-600 mb-6">Set up the pitches for your Shark Tank session</p>
+            
+            <div className="space-y-4 mb-6">
+              {customPitches.map((pitch, index) => (
+                <div key={pitch.id} className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="font-semibold text-lg">Pitch {index + 1}</h3>
+                    {customPitches.length > 1 && (
+                      <button
+                        onClick={() => removePitch(index)}
+                        className="text-red-600 hover:text-red-800 text-sm"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Pitch Title
+                      </label>
+                      <input
+                        type="text"
+                        value={pitch.title}
+                        onChange={(e) => updatePitch(index, 'title', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Presenter Name
+                      </label>
+                      <input
+                        type="text"
+                        value={pitch.presenter}
+                        onChange={(e) => updatePitch(index, 'presenter', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Description
+                      </label>
+                      <textarea
+                        value={pitch.description}
+                        onChange={(e) => updatePitch(index, 'description', e.target.value)}
+                        rows="2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <button
+              onClick={addPitch}
+              className="mb-6 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition duration-200"
+            >
+              + Add Another Pitch
+            </button>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowPitchSetup(false)}
+                className="flex-1 px-6 py-3 bg-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-400 transition duration-200"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleCreateSession}
+                disabled={isCreating}
+                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition duration-200"
+              >
+                {isCreating ? 'Creating session...' : 'Start Session'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full text-center">
@@ -284,18 +412,18 @@ const CreateSession = () => {
         <p className="text-gray-600 mb-8">Create a session or join an existing one</p>
         
         <button
-          onClick={handleCreateSession}
-          disabled={isCreating}
-          className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition duration-200 flex items-center justify-center"
+          onClick={() => setShowPitchSetup(true)}
+          className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition duration-200 flex items-center justify-center mb-3"
         >
-          {isCreating ? (
-            <span>Creating session...</span>
-          ) : (
-            <>
-              <Link className="w-5 h-5 mr-2" />
-              Create New Session
-            </>
-          )}
+          <Link className="w-5 h-5 mr-2" />
+          Create New Session
+        </button>
+        
+        <button
+          onClick={handleCreateSession}
+          className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300 transition duration-200 text-sm"
+        >
+          Quick Start (Use Default Pitches)
         </button>
         
         <div className="mt-6 text-sm text-gray-600">
@@ -373,10 +501,11 @@ const PitchVoting = () => {
     updateRating,
     updateInvestment,
     currentUser,
-    getRemainingBudget
+    getRemainingBudget,
+    sessionPitches
   } = useApp();
   
-  const currentPitch = samplePitches[currentPitchIndex];
+  const currentPitch = sessionPitches[currentPitchIndex];
   const userRatings = ratings[currentUser.id]?.[currentPitch.id] || {};
   const userInvestment = investments[currentUser.id]?.[currentPitch.id] || 0;
   
@@ -434,7 +563,7 @@ const PitchVoting = () => {
   };
 
   const nextPitch = () => {
-    if (currentPitchIndex < samplePitches.length - 1) {
+    if (currentPitchIndex < sessionPitches.length - 1) {
       setCurrentPitchIndex(currentPitchIndex + 1);
     }
   };
@@ -460,13 +589,13 @@ const PitchVoting = () => {
           <h2 className="text-2xl font-bold text-gray-800">{currentPitch.title}</h2>
           <p className="text-gray-600">by {currentPitch.presenter}</p>
           <p className="text-sm text-gray-500 mt-1">
-            Pitch {currentPitchIndex + 1} of {samplePitches.length}
+            Pitch {currentPitchIndex + 1} of {sessionPitches.length}
           </p>
         </div>
         
         <button
           onClick={nextPitch}
-          disabled={currentPitchIndex === samplePitches.length - 1}
+          disabled={currentPitchIndex === sessionPitches.length - 1}
           className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ChevronRight className="w-5 h-5" />
@@ -557,7 +686,7 @@ const PitchVoting = () => {
 
 // Investment Dashboard Component
 const InvestmentDashboard = () => {
-  const { investments, updateInvestment, currentUser, getRemainingBudget, TOTAL_BUDGET } = useApp();
+  const { investments, updateInvestment, currentUser, getRemainingBudget, TOTAL_BUDGET, sessionPitches } = useApp();
   const userInvestments = investments[currentUser.id] || {};
 
   const handleInvestmentUpdate = (pitchId, newAmount) => {
@@ -612,7 +741,7 @@ const InvestmentDashboard = () => {
       </div>
 
       <div className="space-y-3">
-        {samplePitches.map(pitch => (
+        {sessionPitches.map(pitch => (
           <div key={pitch.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
             <div className="flex-1">
               <h4 className="font-semibold text-gray-800">{pitch.title}</h4>
@@ -641,8 +770,8 @@ const InvestmentDashboard = () => {
 
 // Admin Dashboard Component
 const AdminDashboard = () => {
-  const { ratings, investments, allParticipants, TOTAL_BUDGET } = useApp();
-  const [selectedPitch, setSelectedPitch] = useState(samplePitches[0].id);
+  const { ratings, investments, allParticipants, TOTAL_BUDGET, sessionPitches } = useApp();
+  const [selectedPitch, setSelectedPitch] = useState(sessionPitches[0]?.id || 1);
   const [viewMode, setViewMode] = useState('byPitch');
 
   const getPitchDetails = (pitchId) => {
@@ -672,7 +801,7 @@ const AdminDashboard = () => {
     const userInvestments = investments[userId] || {};
     const totalInvested = Object.values(userInvestments).reduce((sum, amt) => sum + amt, 0);
 
-    const pitchDetails = samplePitches.map(pitch => ({
+    const pitchDetails = sessionPitches.map(pitch => ({
       pitchId: pitch.id,
       pitchTitle: pitch.title,
       coolness: userRatings[pitch.id]?.coolness || 0,
@@ -725,7 +854,7 @@ const AdminDashboard = () => {
             onChange={(e) => setSelectedPitch(parseInt(e.target.value))}
             className="w-full p-2 mb-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
-            {samplePitches.map(pitch => (
+            {sessionPitches.map(pitch => (
               <option key={pitch.id} value={pitch.id}>
                 {pitch.title} - {pitch.presenter}
               </option>
