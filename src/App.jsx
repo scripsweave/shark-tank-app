@@ -14,7 +14,6 @@ const firebaseConfig = {
   appId: "1:368502305847:web:47e3aff46733312ed6fbb2"
 };
 
-
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
@@ -1057,6 +1056,7 @@ const SessionHeader = () => {
 const AdminPage = () => {
   const { sessionId, allParticipants } = useApp();
   const [copied, setCopied] = useState(false);
+  const [showAIInsights, setShowAIInsights] = useState(false);
 
   const sessionUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
   const adminUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}&admin=true`;
@@ -1092,24 +1092,40 @@ const AdminPage = () => {
                 </button>
                 {copied && <span className="text-xs text-green-600">Copied!</span>}
               </div>
-              <button
-                onClick={() => window.location.href = sessionUrl}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
-              >
-                Exit Admin View
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowAIInsights(!showAIInsights)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    showAIInsights 
+                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' 
+                      : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                  }`}
+                >
+                  {showAIInsights ? '📊 Hide AI Insights' : '🤖 Show AI Insights'}
+                </button>
+                <button
+                  onClick={() => window.location.href = sessionUrl}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
+                >
+                  Exit Admin View
+                </button>
+              </div>
             </div>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
-            <Results />
+        {showAIInsights ? (
+          <AIInsightsDashboard />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <Results />
+            </div>
+            <div>
+              <AdminDashboard />
+            </div>
           </div>
-          <div>
-            <AdminDashboard />
-          </div>
-        </div>
+        )}
         
         <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800 font-medium">Admin URL</p>
