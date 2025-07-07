@@ -1016,8 +1016,427 @@ const Results = () => {
   );
 };
 
-// Session Header Component
-const SessionHeader = () => {
+// AI Insights Dashboard Component (moved before AdminPage)
+const AIInsightsDashboard = () => {
+  const { ratings, investments, allParticipants, sessionPitches } = useApp();
+  
+  // Add safety check
+  if (!sessionPitches || sessionPitches.length === 0 || allParticipants.length === 0) {
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4">AI Insights</h3>
+        <p className="text-gray-600">Waiting for more data... AI insights will appear once participants start voting.</p>
+      </div>
+    );
+  }
+  
+  // Calculate various insights
+  const calculateInsights = () => {
+    try {
+      // Investment Sentiment Patterns
+    const pitchStats = sessionPitches.map(pitch => {
+      let totalCoolness = 0, totalRelevance = 0, totalInvestment = 0;
+      let ratingCount = 0, investorCount = 0;
+      const investments_array = [];
+      const coolness_array = [];
+      const relevance_array = [];
+
+      Object.entries(ratings).forEach(([userId, userRatings]) => {
+        if (userRatings[pitch.id]) {
+          if (userRatings[pitch.id].coolness) {
+            totalCoolness += userRatings[pitch.id].coolness;
+            coolness_array.push(userRatings[pitch.id].coolness);
+            ratingCount++;
+          }
+          if (userRatings[pitch.id].relevance) {
+            totalRelevance += userRatings[pitch.id].relevance;
+            relevance_array.push(userRatings[pitch.id].relevance);
+          }
+        }
+      });
+
+      Object.entries(investments).forEach(([userId, userInvestments]) => {
+        if (userInvestments[pitch.id] && userInvestments[pitch.id] > 0) {
+          totalInvestment += userInvestments[pitch.id];
+          investments_array.push(userInvestments[pitch.id]);
+          investorCount++;
+        }
+      });
+
+      const avgCoolness = ratingCount > 0 ? totalCoolness / ratingCount : 0;
+      const avgRelevance = ratingCount > 0 ? totalRelevance / ratingCount : 0;
+      
+      // Calculate variance for polarization
+      const coolnessVariance = coolness_array.length > 0 
+        ? coolness_array.reduce((sum, val) => sum + Math.pow(val - avgCoolness, 2), 0) / coolness_array.length
+        : 0;
+
+      return {
+        ...pitch,
+        avgCoolness,
+        avgRelevance,
+        totalInvestment,
+        investorCount,
+        coolnessVariance,
+        investments_array
+      };
+    });
+
+    // Enthusiasm Index (correlation between coolness and investment)
+    const enthusiasmIndex = pitchStats.map(pitch => {
+      const investmentScore = pitch.totalInvestment / (allParticipants.length * 10000) * 10;
+      const enthusiasm = pitch.avgCoolness > 0 ? investmentScore / pitch.avgCoolness : 0;
+      return {
+        pitch: pitch.title,
+        enthusiasm: enthusiasm,
+        coolness: pitch.avgCoolness,
+        investment: investmentScore
+      };
+    });
+
+    // Relevance-Investment Gap
+    const relevanceGap = pitchStats.map(pitch => {
+      const investmentScore = pitch.totalInvestment / (allParticipants.length * 10000) * 10;
+      const gap = pitch.avgRelevance - investmentScore;
+      return {
+        pitch: pitch.title,
+        gap: gap,
+        relevance: pitch.avgRelevance,
+        investment: investmentScore
+      };
+    }).filter(p => p.gap > 2); // Show only significant gaps
+
+    // Polarization scores
+    const polarizedPitches = pitchStats
+      .filter(pitch => pitch.coolnessVariance > 4)
+      .map(pitch => ({
+        pitch: pitch.title,
+        variance: pitch.coolnessVariance,
+        avgScore: pitch.avgCoolness
+      }));
+
+    // Participant Profiles
+    const participantProfiles = allParticipants.map(participant => {
+      const userInvestments = investments[participant.id] || {};
+      const userRatings = ratings[participant.id] || {};
+      
+      const investmentCount = Object.values(userInvestments).filter(amt => amt > 0).length;
+      const totalInvested = Object.values(userInvestments).reduce((sum, amt) => sum + amt, 0);
+      const largestInvestment = Math.max(...Object.values(userInvestments), 0);
+      
+      const avgRating = Object.values(userRatings).reduce((sum, rating) => {
+        const score = ((rating.coolness || 0) + (rating.relevance || 0)) / 2;
+        return sum + score;
+      }, 0) / (Object.keys(userRatings).length || 1);
+
+      let type = 'Observer';
+      if (investmentCount === 0) {
+        type = 'Observer';
+      } else if (investmentCount >= sessionPitches.length * 0.7) {
+        type = 'Spray & Pray';
+      } else if (largestInvestment >= totalInvested * 0.7) {
+        type = 'Big Better';
+      } else {
+        type = 'Balanced';
+      }
+
+      return {
+        name: participant.name,
+        type,
+        investmentCount,
+        totalInvested,
+        avgRating
+      };
+    });
+
+    // Session Dynamics - Pitch Order Bias
+    const orderBias = pitchStats.map((pitch, index) => ({
+      position: index + 1,
+      title: pitch.title,
+      totalInvestment: pitch.totalInvestment,
+      avgScore: (pitch.avgCoolness + pitch.avgRelevance) / 2
+    }));
+
+    // Anomaly Detection
+    const anomalies = [];
+    
+    // Check for rating-investment mismatches
+    Object.entries(ratings).forEach(([userId, userRatings]) => {
+      const user = allParticipants.find(p => p.id === parseInt(userId));
+      if (!user) return;
+      
+      Object.entries(userRatings).forEach(([pitchId, rating]) => {
+        const investment = investments[userId]?.[pitchId] || 0;
+        const avgRating = ((rating.coolness || 0) + (rating.relevance || 0)) / 2;
+        
+        if (avgRating >= 8 && investment === 0) {
+          anomalies.push({
+            type: 'High Rating, No Investment',
+            user: user.name,
+            pitch: sessionPitches.find(p => p.id === parseInt(pitchId))?.title,
+            detail: `Rated ${avgRating.toFixed(1)}/10 but invested $0`
+          });
+        }
+        
+        if (avgRating <= 3 && investment > 2000) {
+          anomalies.push({
+            type: 'Low Rating, High Investment',
+            user: user.name,
+            pitch: sessionPitches.find(p => p.id === parseInt(pitchId))?.title,
+            detail: `Rated ${avgRating.toFixed(1)}/10 but invested ${investment.toLocaleString()}`
+          });
+        }
+      });
+    });
+
+    return {
+      enthusiasmIndex,
+      relevanceGap,
+      polarizedPitches,
+      participantProfiles,
+      orderBias,
+      anomalies
+    };
+    } catch (error) {
+      console.error('Error calculating insights:', error);
+      return {
+        enthusiasmIndex: [],
+        relevanceGap: [],
+        polarizedPitches: [],
+        participantProfiles: [],
+        orderBias: [],
+        anomalies: []
+      };
+    }
+  };
+
+  const insights = calculateInsights();
+
+  try {
+    return (
+      <div className="space-y-6">
+      <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 rounded-xl shadow-lg">
+        <h2 className="text-2xl font-bold mb-2 flex items-center">
+          <TrendingUp className="w-8 h-8 mr-3" />
+          AI-Powered Insights Dashboard
+        </h2>
+        <p className="text-purple-100">Advanced sentiment analysis and behavioral patterns from your voting session</p>
+      </div>
+
+      {/* Investment Sentiment Patterns */}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+          <Star className="w-5 h-5 mr-2 text-yellow-500" />
+          Investment Sentiment Patterns
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-4 rounded-lg">
+            <h4 className="font-semibold text-gray-800 mb-2">Enthusiasm Index</h4>
+            <p className="text-sm text-gray-600 mb-3">
+              Shows if people invest in what excites them (investment vs coolness ratio)
+            </p>
+            <div className="space-y-2">
+              {insights.enthusiasmIndex.map((item, i) => (
+                <div key={i} className="flex justify-between items-center">
+                  <span className="text-sm">{item.pitch}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-20 bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full"
+                        style={{width: `${Math.min(item.enthusiasm * 100, 100)}%`}}
+                      />
+                    </div>
+                    <span className="text-xs font-semibold">
+                      {item.enthusiasm > 1 ? '🔥' : item.enthusiasm > 0.5 ? '😊' : '😴'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-4 rounded-lg">
+            <h4 className="font-semibold text-gray-800 mb-2">Relevance-Investment Gap</h4>
+            <p className="text-sm text-gray-600 mb-3">
+              High relevance but low investment may indicate execution concerns
+            </p>
+            {insights.relevanceGap.length > 0 ? (
+              <div className="space-y-2">
+                {insights.relevanceGap.map((item, i) => (
+                  <div key={i} className="bg-white p-2 rounded border border-blue-200">
+                    <div className="font-medium text-sm">{item.pitch}</div>
+                    <div className="text-xs text-gray-600">
+                      Relevance: {item.relevance.toFixed(1)} → Investment: {item.investment.toFixed(1)}
+                      <span className="text-red-600 ml-2">Gap: {item.gap.toFixed(1)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No significant gaps detected</p>
+            )}
+          </div>
+        </div>
+
+        {insights.polarizedPitches.length > 0 && (
+          <div className="mt-4 bg-gradient-to-br from-red-50 to-pink-50 p-4 rounded-lg">
+            <h4 className="font-semibold text-gray-800 mb-2">Polarizing Pitches</h4>
+            <p className="text-sm text-gray-600 mb-3">
+              These pitches split the audience with highly varied opinions
+            </p>
+            <div className="space-y-2">
+              {insights.polarizedPitches.map((item, i) => (
+                <div key={i} className="flex justify-between items-center">
+                  <span className="text-sm font-medium">{item.pitch}</span>
+                  <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
+                    Variance: {item.variance.toFixed(1)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Participant Behavior Profiles */}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+          <Users className="w-5 h-5 mr-2 text-blue-500" />
+          Participant Behavior Profiles
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          AI-identified investor archetypes based on investment patterns
+        </p>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          {['Big Better', 'Spray & Pray', 'Balanced', 'Observer'].map(type => {
+            const count = insights.participantProfiles.filter(p => p.type === type).length;
+            const emoji = type === 'Big Better' ? '🎯' : 
+                         type === 'Spray & Pray' ? '🌊' : 
+                         type === 'Balanced' ? '⚖️' : '👀';
+            return (
+              <div key={type} className="text-center p-3 bg-gray-50 rounded-lg">
+                <div className="text-2xl mb-1">{emoji}</div>
+                <div className="font-semibold text-sm">{type}</div>
+                <div className="text-2xl font-bold text-gray-700">{count}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="space-y-2">
+          {insights.participantProfiles.map((profile, i) => (
+            <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+              <div className="flex items-center gap-3">
+                <span className="font-medium">{profile.name}</span>
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                  {profile.type}
+                </span>
+              </div>
+              <div className="text-sm text-gray-600">
+                ${profile.totalInvested.toLocaleString()} across {profile.investmentCount} pitches
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Session Dynamics */}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+          <TrendingUp className="w-5 h-5 mr-2 text-green-500" />
+          Session Dynamics
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          How pitch order affects investment and ratings
+        </p>
+        
+        <div className="space-y-3">
+          {insights.orderBias.map((item, i) => (
+            <div key={i} className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-full flex items-center justify-center text-sm font-bold">
+                  {item.position}
+                </div>
+                <span className="font-medium">{item.title}</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-sm">
+                  <span className="text-gray-600">Score:</span>
+                  <span className="font-semibold ml-1">{item.avgScore.toFixed(1)}</span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-gray-600">Investment:</span>
+                  <span className="font-semibold text-green-600 ml-1">
+                    ${item.totalInvestment.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {insights.orderBias.length > 2 && (
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>Pattern Detected:</strong> 
+              {insights.orderBias[0].totalInvestment > insights.orderBias[insights.orderBias.length - 1].totalInvestment 
+                ? " Early pitches received more investment - possible investor fatigue"
+                : insights.orderBias[insights.orderBias.length - 1].totalInvestment > insights.orderBias[0].totalInvestment
+                ? " Later pitches received more investment - possible warm-up effect"
+                : " Investment fairly distributed across pitch order"}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Anomaly Detection */}
+      {insights.anomalies.length > 0 && (
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
+            <AlertTriangle className="w-5 h-5 mr-2 text-red-500" />
+            Anomaly Detection
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Unusual patterns that might need investigation
+          </p>
+          
+          <div className="space-y-3">
+            {insights.anomalies.map((anomaly, i) => (
+              <div key={i} className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="font-medium text-red-800">{anomaly.type}</div>
+                    <div className="text-sm text-gray-700 mt-1">
+                      {anomaly.user} → {anomaly.pitch}
+                    </div>
+                  </div>
+                  <div className="text-sm text-red-600">
+                    {anomaly.detail}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+  } catch (error) {
+    console.error('Error rendering AI insights:', error);
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4">AI Insights Error</h3>
+        <p className="text-red-600">There was an error generating insights. Please try refreshing the page.</p>
+        <p className="text-sm text-gray-600 mt-2">Error: {error.message}</p>
+      </div>
+    );
+  }
+};
+
+// Admin Page Component
+const AdminPage = () => {
   const { sessionId, currentUser, allParticipants } = useApp();
   const [copied, setCopied] = useState(false);
 
