@@ -270,7 +270,6 @@ const CreateSession = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [showPitchSetup, setShowPitchSetup] = useState(false);
   const [customPitches, setCustomPitches] = useState(samplePitches);
-  const [editingPitch, setEditingPitch] = useState(null);
 
   const handleCreateSession = async () => {
     setIsCreating(true);
@@ -738,6 +737,7 @@ const InvestmentDashboard = () => {
           </span>
         </div>
       </div>
+
 
       <div className="space-y-3">
         {sessionPitches.map(pitch => (
