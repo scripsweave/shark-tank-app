@@ -942,6 +942,8 @@ const AdminDashboard = () => {
       </div>
     );
   }
+};  
+
 
 // Results Component
 const Results = () => {
