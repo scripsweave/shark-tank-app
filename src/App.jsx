@@ -1437,6 +1437,89 @@ const AIInsightsDashboard = () => {
 
 // Admin Page Component
 const AdminPage = () => {
+  const { sessionId, allParticipants } = useApp();
+  const [copied, setCopied] = useState(false);
+  const [showAIInsights, setShowAIInsights] = useState(false);
+
+  const sessionUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
+  const adminUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}&admin=true`;
+
+  const copySessionUrl = () => {
+    navigator.clipboard.writeText(sessionUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 p-4">
+      <div className="max-w-6xl mx-auto">
+        <div className="bg-white rounded-xl shadow-lg p-4 mb-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
+              <div className="text-sm text-gray-600 flex items-center mt-2">
+                <Users className="w-4 h-4 mr-1" />
+                {allParticipants.length} participants
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Session URL:</span>
+                <code className="text-xs bg-gray-100 px-2 py-1 rounded truncate max-w-[200px]">{sessionUrl}</code>
+                <button
+                  onClick={copySessionUrl}
+                  className="p-1 hover:bg-gray-100 rounded transition"
+                  title="Copy session URL"
+                >
+                  <Copy className="w-4 h-4 text-gray-600" />
+                </button>
+                {copied && <span className="text-xs text-green-600">Copied!</span>}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowAIInsights(!showAIInsights)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    showAIInsights 
+                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' 
+                      : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                  }`}
+                >
+                  {showAIInsights ? '📊 Hide AI Insights' : '🤖 Show AI Insights'}
+                </button>
+                <button
+                  onClick={() => window.location.href = sessionUrl}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
+                >
+                  Exit Admin View
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {showAIInsights ? (
+          <AIInsightsDashboard />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <Results />
+            </div>
+            <div>
+              <AdminDashboard />
+            </div>
+          </div>
+        )}
+        
+        <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800 font-medium">Admin URL</p>
+          <p className="text-xs text-blue-700 mt-1">
+            Bookmark this URL to return to admin view: <code className="bg-blue-100 px-1 rounded">{adminUrl}</code>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
   const { sessionId, currentUser, allParticipants } = useApp();
   const [copied, setCopied] = useState(false);
 
