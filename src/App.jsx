@@ -932,6 +932,16 @@ const AdminDashboard = () => {
       )}
     </div>
   );
+  } catch (error) {
+    console.error('Error rendering AI insights:', error);
+    return (
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4">AI Insights Error</h3>
+        <p className="text-red-600">There was an error generating insights. Please try refreshing the page.</p>
+        <p className="text-sm text-gray-600 mt-2">Error: {error.message}</p>
+      </div>
+    );
+  }
 };
 
 // Results Component
@@ -1052,8 +1062,8 @@ const SessionHeader = () => {
   );
 };
 
-// Admin Page Component
-const AdminPage = () => {
+// AI Insights Dashboard Component
+const AIInsightsDashboard = () => {
   const { sessionId, allParticipants } = useApp();
   const [copied, setCopied] = useState(false);
   const [showAIInsights, setShowAIInsights] = useState(false);
