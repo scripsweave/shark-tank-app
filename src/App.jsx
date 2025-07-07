@@ -942,7 +942,6 @@ const AdminDashboard = () => {
       </div>
     );
   }
-};
 
 // Results Component
 const Results = () => {
@@ -1433,6 +1432,7 @@ const AIInsightsDashboard = () => {
       </div>
     );
   }
+};
 };
 
 // Admin Page Component
