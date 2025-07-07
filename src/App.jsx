@@ -1,3 +1,6 @@
+Yes, here is the complete, corrected code for your `App-v42.jsx` file. You can replace the entire content of your file with the code below.
+
+```javascript
 import React, { useState, useEffect, createContext, useContext, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, DollarSign, Star, Target, TrendingUp, Users, Award, Copy, Link, AlertTriangle } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
@@ -5,13 +8,13 @@ import { getDatabase, ref, set, onValue, push, get } from 'firebase/database';
 
 // REPLACE THIS WITH YOUR FIREBASE CONFIG FROM STEP 1.3
 const firebaseConfig = {
-  apiKey: "AIzaSyAgVVmCiipVGZdT-KxKSBFUpjBO3x9Th1s",
-  authDomain: "shark-tank-voting.firebaseapp.com",
-  databaseURL: "https://shark-tank-voting-default-rtdb.firebaseio.com",
-  projectId: "shark-tank-voting",
-  storageBucket: "shark-tank-voting.firebasestorage.app",
-  messagingSenderId: "368502305847",
-  appId: "1:368502305847:web:47e3aff46733312ed6fbb2"
+  apiKey: "YOUR_API_KEY_HERE",
+  authDomain: "YOUR_AUTH_DOMAIN_HERE",
+  databaseURL: "YOUR_DATABASE_URL_HERE",
+  projectId: "YOUR_PROJECT_ID_HERE",
+  storageBucket: "YOUR_STORAGE_BUCKET_HERE",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID_HERE",
+  appId: "YOUR_APP_ID_HERE"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -738,7 +741,6 @@ const InvestmentDashboard = () => {
         </div>
       </div>
 
-
       <div className="space-y-3">
         {sessionPitches.map(pitch => (
           <div key={pitch.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -1010,7 +1012,6 @@ const Results = () => {
 const AIInsightsDashboard = () => {
   const { ratings, investments, allParticipants, sessionPitches } = useApp();
   
-  // Add safety check
   if (!sessionPitches || sessionPitches.length === 0 || allParticipants.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-lg p-6">
@@ -1020,10 +1021,8 @@ const AIInsightsDashboard = () => {
     );
   }
   
-  // Calculate various insights
   const calculateInsights = () => {
     try {
-      // Investment Sentiment Patterns
       const pitchStats = sessionPitches.map(pitch => {
         let totalCoolness = 0, totalRelevance = 0, totalInvestment = 0;
         let ratingCount = 0, investorCount = 0;
@@ -1056,7 +1055,6 @@ const AIInsightsDashboard = () => {
         const avgCoolness = ratingCount > 0 ? totalCoolness / ratingCount : 0;
         const avgRelevance = ratingCount > 0 ? totalRelevance / ratingCount : 0;
         
-        // Calculate variance for polarization
         const coolnessVariance = coolness_array.length > 0 
           ? coolness_array.reduce((sum, val) => sum + Math.pow(val - avgCoolness, 2), 0) / coolness_array.length
           : 0;
@@ -1072,7 +1070,6 @@ const AIInsightsDashboard = () => {
         };
       });
 
-      // Enthusiasm Index (correlation between coolness and investment)
       const enthusiasmIndex = pitchStats.map(pitch => {
         const investmentScore = pitch.totalInvestment / (allParticipants.length * 10000) * 10;
         const enthusiasm = pitch.avgCoolness > 0 ? investmentScore / pitch.avgCoolness : 0;
@@ -1084,7 +1081,6 @@ const AIInsightsDashboard = () => {
         };
       });
 
-      // Relevance-Investment Gap
       const relevanceGap = pitchStats.map(pitch => {
         const investmentScore = pitch.totalInvestment / (allParticipants.length * 10000) * 10;
         const gap = pitch.avgRelevance - investmentScore;
@@ -1094,9 +1090,8 @@ const AIInsightsDashboard = () => {
           relevance: pitch.avgRelevance,
           investment: investmentScore
         };
-      }).filter(p => p.gap > 2); // Show only significant gaps
+      }).filter(p => p.gap > 2);
 
-      // Polarization scores
       const polarizedPitches = pitchStats
         .filter(pitch => pitch.coolnessVariance > 4)
         .map(pitch => ({
@@ -1105,7 +1100,6 @@ const AIInsightsDashboard = () => {
           avgScore: pitch.avgCoolness
         }));
 
-      // Participant Profiles
       const participantProfiles = allParticipants.map(participant => {
         const userInvestments = investments[participant.id] || {};
         const userRatings = ratings[participant.id] || {};
@@ -1139,7 +1133,6 @@ const AIInsightsDashboard = () => {
         };
       });
 
-      // Session Dynamics - Pitch Order Bias
       const orderBias = pitchStats.map((pitch, index) => ({
         position: index + 1,
         title: pitch.title,
@@ -1147,10 +1140,8 @@ const AIInsightsDashboard = () => {
         avgScore: (pitch.avgCoolness + pitch.avgRelevance) / 2
       }));
 
-      // Anomaly Detection
       const anomalies = [];
       
-      // Check for rating-investment mismatches
       Object.entries(ratings).forEach(([userId, userRatings]) => {
         const user = allParticipants.find(p => p.id === parseInt(userId));
         if (!user) return;
@@ -1213,7 +1204,6 @@ const AIInsightsDashboard = () => {
           <p className="text-purple-100">Advanced sentiment analysis and behavioral patterns from your voting session</p>
         </div>
 
-        {/* Investment Sentiment Patterns */}
         <div className="bg-white rounded-xl shadow-lg p-6">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
             <Star className="w-5 h-5 mr-2 text-yellow-500" />
@@ -1289,7 +1279,6 @@ const AIInsightsDashboard = () => {
           )}
         </div>
 
-        {/* Participant Behavior Profiles */}
         <div className="bg-white rounded-xl shadow-lg p-6">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
             <Users className="w-5 h-5 mr-2 text-blue-500" />
@@ -1332,7 +1321,6 @@ const AIInsightsDashboard = () => {
           </div>
         </div>
 
-        {/* Session Dynamics */}
         <div className="bg-white rounded-xl shadow-lg p-6">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
             <TrendingUp className="w-5 h-5 mr-2 text-green-500" />
@@ -1381,7 +1369,6 @@ const AIInsightsDashboard = () => {
           )}
         </div>
 
-        {/* Anomaly Detection */}
         {insights.anomalies.length > 0 && (
           <div className="bg-white rounded-xl shadow-lg p-6">
             <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
@@ -1425,49 +1412,171 @@ const AIInsightsDashboard = () => {
   }
 };
 
-// Session Header Component
-const SessionHeader = () => {
-  const { sessionId, allParticipants, currentUser } = useApp();
+// Admin Page Component
+const AdminPage = () => {
+  const { sessionId, allParticipants } = useApp();
   const [copied, setCopied] = useState(false);
+  const [showAIInsights, setShowAIInsights] = useState(false);
+
   const sessionUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
-  
-  const copyToClipboard = () => {
+  const adminUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}&admin=true`;
+
+  const copySessionUrl = () => {
     navigator.clipboard.writeText(sessionUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-4 mb-6">
-      <h1 className="text-xl sm:text-2xl font-bold text-gray-800 text-center mb-4">Shark Tank Voting Session</h1>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 hidden sm:inline">Session URL:</span>
-            <code className="text-xs bg-gray-100 px-2 py-1 rounded truncate max-w-[200px] sm:max-w-none">{sessionUrl}</code>
-            <button
-              onClick={copyToClipboard}
-              className="p-1 hover:bg-gray-100 rounded transition flex-shrink-0"
-              title="Copy session URL"
-            >
-              <Copy className="w-4 h-4 text-gray-600" />
-            </button>
-            {copied && <span className="text-xs text-green-600">Copied!</span>}
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 p-4">
+      <div className="max-w-6xl mx-auto">
+        <div className="bg-white rounded-xl shadow-lg p-4 mb-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
+              <div className="text-sm text-gray-600 flex items-center mt-2">
+                <Users className="w-4 h-4 mr-1" />
+                {allParticipants.length} participants
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Session URL:</span>
+                <code className="text-xs bg-gray-100 px-2 py-1 rounded truncate max-w-[200px]">{sessionUrl}</code>
+                <button
+                  onClick={copySessionUrl}
+                  className="p-1 hover:bg-gray-100 rounded transition"
+                  title="Copy session URL"
+                >
+                  <Copy className="w-4 h-4 text-gray-600" />
+                </button>
+                {copied && <span className="text-xs text-green-600">Copied!</span>}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowAIInsights(!showAIInsights)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+                    showAIInsights 
+                      ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' 
+                      : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                  }`}
+                >
+                  {showAIInsights ? '📊 Hide AI Insights' : '🤖 Show AI Insights'}
+                </button>
+                <button
+                  onClick={() => window.location.href = sessionUrl}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm"
+                >
+                  Exit Admin View
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-gray-600 flex items-center">
-            <Users className="w-4 h-4 mr-1" />
-            {allParticipants.length} participants
+        
+        {showAIInsights ? (
+          <AIInsightsDashboard />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <Results />
+            </div>
+            <div>
+              <AdminDashboard />
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-600">Welcome,</p>
-            <p className="font-semibold text-gray-800">{currentUser.name}</p>
-          </div>
+        )}
+        
+        <div className="mt-6 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800 font-medium">Admin URL</p>
+          <p className="text-xs text-blue-700 mt-1">
+            Bookmark this URL to return to admin view: <code className="bg-blue-100 px-1 rounded">{adminUrl}</code>
+          </p>
         </div>
       </div>
     </div>
   );
 };
 
-export default AppProvider;
+// Main App Component
+const App = () => {
+  const { currentUser, sessionId, isLoading, sessionExists } = useApp();
+  const urlParams = new URLSearchParams(window.location.search);
+  const isAdminView = urlParams.get('admin') === 'true';
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading session...</div>
+      </div>
+    );
+  }
+
+  if (!sessionId) {
+    return <CreateSession />;
+  }
+
+  if (!sessionExists) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full text-center">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">Session Not Found</h1>
+          <p className="text-gray-600 mb-6">This session doesn't exist or has expired.</p>
+          <button
+            onClick={() => window.location.href = window.location.pathname}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+          >
+            Create New Session
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAdminView) {
+    return <AdminPage />;
+  }
+
+  if (!currentUser) {
+    return <Login />;
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-purple-900 p-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-xl shadow-lg p-4 mb-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Shark Tank Voting</h1>
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-gray-600 flex items-center">
+                <Users className="w-4 h-4 mr-1" />
+                {allParticipants.length} participants
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Welcome,</p>
+                <p className="font-semibold text-gray-800">{currentUser.name}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 gap-6">
+          <PitchVoting />
+          <InvestmentDashboard />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Root Component with Provider
+export default function SharkTankApp() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionId = urlParams.get('session');
+  
+  return (
+    <AppProvider sessionId={sessionId}>
+      <App />
+    </AppProvider>
+  );
+}
