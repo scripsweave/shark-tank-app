@@ -1469,3 +1469,5 @@ const SessionHeader = () => {
     </div>
   );
 };
+
+export default AppProvider;
