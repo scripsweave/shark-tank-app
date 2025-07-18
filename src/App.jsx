@@ -26,33 +26,58 @@ const useApp = () => {
   return context;
 };
 
-// Sample pitches data
+// Sample pitches data based on the provided image
 const samplePitches = [
   {
     id: 1,
-    title: "EcoSmart Home",
-    presenter: "Sarah Johnson",
-    description: "AI-powered home automation system that reduces energy consumption by 40%"
+    title: "AI Integration for Payroll",
+    presenter: "Juane",
+    description: "AI that can transform any employee data for data migrations and integration in a fraction of the traditional time."
   },
   {
     id: 2,
-    title: "HealthTrack Pro",
-    presenter: "Mike Chen",
-    description: "Wearable device that monitors vital signs and predicts health issues 72 hours in advance"
+    title: "Test Case Automation",
+    presenter: "Jhani",
+    description: "GenAI and ML to automate test case creation, validation, and simulation of real-world payroll scenarios."
   },
   {
     id: 3,
-    title: "LearnFlow",
-    presenter: "Emma Williams",
-    description: "Personalized AI tutor that adapts to each student's learning style"
+    title: "Payroll Variance Explanation",
+    presenter: "Jan",
+    description: "Explain payroll variances, saving payroll analysts massive amounts of time."
   },
   {
     id: 4,
-    title: "FoodSave",
-    presenter: "Carlos Rodriguez",
-    description: "App connecting restaurants with food banks to reduce waste by 60%"
+    title: "SAP Joule",
+    presenter: "Imran",
+    description: "Chatbot to explain paysatements or develop custom agents for SAP."
+  },
+  {
+    id: 5,
+    title: "Payroll Legal Watch Agent",
+    presenter: "Andrich and Arne",
+    description: "AI that scans for updated legislation and compliance requirements."
+  },
+  {
+    id: 6,
+    title: "Grant Automation",
+    presenter: "Chris",
+    description: "AI that help complete complex grant requests for MIT. Can be adopted to respond to RFPs."
+  },
+  {
+    id: 7,
+    title: "System42",
+    presenter: "Anrich/Arne",
+    description: "Platform for AI agents."
+  },
+  {
+    id: 8,
+    title: "AI Roadmapping",
+    presenter: "Jan",
+    description: "Service to help clients create a strategic roadmap for payroll AI deployment."
   }
 ];
+
 
 // Debounce utility
 function debounce(func, wait) {
@@ -165,7 +190,8 @@ const AppProvider = ({ children, sessionId }) => {
       .reduce((sum, [, amt]) => sum + amt, 0);
     
     if (totalInvested + amount > TOTAL_BUDGET) {
-      alert(`Cannot invest $${amount}. You only have $${TOTAL_BUDGET - totalInvested} remaining.`);
+      // Using a custom modal/alert would be better, but for now, we prevent the action.
+      console.warn(`Cannot invest $${amount}. You only have $${TOTAL_BUDGET - totalInvested} remaining.`);
       return false;
     }
 
@@ -270,7 +296,6 @@ const CreateSession = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [showPitchSetup, setShowPitchSetup] = useState(false);
   const [customPitches, setCustomPitches] = useState(samplePitches);
-  const [editingPitch, setEditingPitch] = useState(null);
 
   const handleCreateSession = async () => {
     setIsCreating(true);
@@ -280,7 +305,7 @@ const CreateSession = () => {
       window.location.href = sessionUrl;
     } catch (error) {
       console.error('Error creating session:', error);
-      alert('Failed to create session. Please try again.');
+      // Using console.error instead of alert
     }
     setIsCreating(false);
   };
@@ -293,7 +318,7 @@ const CreateSession = () => {
 
   const addPitch = () => {
     const newPitch = {
-      id: customPitches.length + 1,
+      id: customPitches.length > 0 ? Math.max(...customPitches.map(p => p.id)) + 1 : 1,
       title: "New Pitch",
       presenter: "Presenter Name",
       description: "Pitch description"
@@ -304,10 +329,6 @@ const CreateSession = () => {
   const removePitch = (index) => {
     if (customPitches.length > 1) {
       const updated = customPitches.filter((_, i) => i !== index);
-      // Re-number the IDs
-      updated.forEach((pitch, i) => {
-        pitch.id = i + 1;
-      });
       setCustomPitches(updated);
     }
   };
@@ -419,7 +440,7 @@ const CreateSession = () => {
         </button>
         
         <button
-          onClick={handleCreateSession}
+          onClick={() => handleCreateSession()}
           className="w-full bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300 transition duration-200 text-sm"
         >
           Quick Start (Use Default Pitches)
@@ -455,28 +476,23 @@ const Login = () => {
         
         {sessionId && (
           <>
-            <div>
+            <form onSubmit={handleSubmit}>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSubmit(e);
-                  }
-                }}
                 placeholder="Your name"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
                 autoFocus
               />
               
               <button
-                onClick={handleSubmit}
+                type="submit"
                 className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-200"
               >
                 Join Session
               </button>
-            </div>
+            </form>
             
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
@@ -531,15 +547,13 @@ const PitchVoting = () => {
   };
 
   const handleInvestmentChange = (value) => {
-    // Handle empty string to allow deletion
     if (value === '') {
       setInvestmentAmount('');
       updateInvestment(currentPitch.id, 0);
       return;
     }
     
-    // Only allow positive whole numbers
-    const cleanValue = value.replace(/[^\d]/g, ''); // Remove all non-digits
+    const cleanValue = value.replace(/[^\d]/g, '');
     
     if (cleanValue === '') {
       setInvestmentAmount('');
@@ -554,7 +568,6 @@ const PitchVoting = () => {
       setInvestmentAmount(amount);
       updateInvestment(currentPitch.id, amount);
     } else {
-      // If amount exceeds budget, set to max available
       const maxAmount = remainingBudget;
       setInvestmentAmount(maxAmount);
       updateInvestment(currentPitch.id, maxAmount);
@@ -657,7 +670,7 @@ const PitchVoting = () => {
               Investment Amount
             </label>
             <span className="text-2xl font-bold text-green-500">
-              ${investmentAmount.toLocaleString()}
+              ${Number(investmentAmount).toLocaleString()}
             </span>
           </div>
           <input
@@ -689,8 +702,7 @@ const InvestmentDashboard = () => {
   const userInvestments = investments[currentUser.id] || {};
 
   const handleInvestmentUpdate = (pitchId, newAmount) => {
-    // Only allow positive whole numbers
-    const cleanValue = newAmount.replace(/[^\d]/g, ''); // Remove all non-digits
+    const cleanValue = newAmount.replace(/[^\d]/g, '');
     
     if (cleanValue === '') {
       updateInvestment(pitchId, 0);
@@ -708,7 +720,6 @@ const InvestmentDashboard = () => {
     if (amount <= maxAllowed) {
       updateInvestment(pitchId, amount);
     } else {
-      // If amount exceeds budget, set to max available
       updateInvestment(pitchId, maxAllowed);
     }
   };
@@ -755,7 +766,7 @@ const InvestmentDashboard = () => {
                 min="0"
                 max={getRemainingBudget() + (userInvestments[pitch.id] || 0)}
                 step="100"
-                value={userInvestments[pitch.id] || 0}
+                value={userInvestments[pitch.id] || ''}
                 onChange={(e) => handleInvestmentUpdate(pitch.id, e.target.value)}
                 className="w-24 px-2 py-1 text-right border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
@@ -1014,9 +1025,12 @@ const SessionHeader = () => {
   const sessionUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}`;
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(sessionUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard.writeText(sessionUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(err => {
+      console.error('Failed to copy: ', err);
+    });
   };
 
   return (
@@ -1061,9 +1075,12 @@ const AdminPage = () => {
   const adminUrl = `${window.location.origin}${window.location.pathname}?session=${sessionId}&admin=true`;
 
   const copySessionUrl = () => {
-    navigator.clipboard.writeText(sessionUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    navigator.clipboard.writeText(sessionUrl).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+    });
   };
 
   return (
