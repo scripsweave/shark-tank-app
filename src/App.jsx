@@ -36,42 +36,36 @@ const samplePitches = [
   },
   {
     id: 2,
-    title: "Test Case Automation",
-    presenter: "Jhani",
-    description: "GenAI and ML to automate test case creation, validation, and simulation of real-world payroll scenarios."
-  },
-  {
-    id: 3,
     title: "Payroll Variance Explanation",
     presenter: "Jan",
     description: "Explain payroll variances, saving payroll analysts massive amounts of time."
   },
   {
-    id: 4,
-    title: "SAP Joule",
-    presenter: "Imran",
-    description: "Chatbot to explain paysatements or develop custom agents for SAP."
-  },
-  {
-    id: 5,
+    id: 3,
     title: "Payroll Legal Watch Agent",
     presenter: "Andrich and Arne",
     description: "AI that scans for updated legislation and compliance requirements."
   },
   {
-    id: 6,
-    title: "Grant Automation",
-    presenter: "Chris",
-    description: "AI that help complete complex grant requests for MIT. Can be adopted to respond to RFPs."
+    id: 4,
+    title: "Ximulacra - Test Case Automation",
+    presenter: "Jhani",
+    description: "GenAI and ML to automate test case creation, validation, and simulation of real-world payroll scenarios."
+  },
+    {
+    id: 5,
+    title: "SAP Joule",
+    presenter: "Imran",
+    description: "Chatbot to explain paysatements or develop custom agents for SAP."
   },
   {
-    id: 7,
+    id: 6,
     title: "System42",
-    presenter: "Anrich/Arne",
+    presenter: "Andrich and Arne",
     description: "Platform for AI agents."
   },
   {
-    id: 8,
+    id: 7,
     title: "AI Roadmapping",
     presenter: "Jan",
     description: "Service to help clients create a strategic roadmap for payroll AI deployment."
